@@ -1,4 +1,4 @@
-# "Evidence for Transcription and Horizontal Gene Transfer in Dipteran Germline-Restricted Chromosomes" (2025)
+# Evidence for Transcription and Horizontal Gene Transfer in Dipteran Germline-Restricted Chromosomes (2025)
 
 ### Overview
 
