@@ -18,7 +18,7 @@ It provides scripts, analyses, and outputs for RNA-seq mapping, intergenic mappi
 | `04_HGT` | Scripts to investigate putative horizontal gene transfer (HGT) regions in GRC2. |
 | `05_Urban_et_al_re-analysis` | Scripts to re-analyse pooled embryo RNA-seq data from Urban et al. (2021). |
 | `figures` | Raw figures and code used to generate main paper Figures 1, 2 and 3 |
-| `Supplementary_materials` | Raw figures and code used to generate supplementary figures 2 and 3 |
+| `supplementary_materials` | Raw figures and code used to generate supplementary figures 2 and 3 and perform statistics |
 ---
 
 ### Directory Structure
@@ -101,7 +101,7 @@ GRC_transcription/
 │       ├── Figure_01.R
 │       ├── Figure_02.R
 │       ├── Figure_03.R
-├── Supplementary_materials/
+├── supplementary_materials/
 │   ├── Figure_S2
 │   ├── Figure_S3
 └── README.md
