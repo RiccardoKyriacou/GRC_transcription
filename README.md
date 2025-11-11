@@ -100,5 +100,8 @@ GRC_transcription/
 │       ├── Figure_01.R
 │       ├── Figure_02.R
 │       ├── Figure_03.R
+├── Supplementary_materials/
+│   ├── Figure_S2
+│   ├── Figure_S3
 └── README.md
 ```
