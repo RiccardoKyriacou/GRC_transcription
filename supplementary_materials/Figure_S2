@@ -1,0 +1,205 @@
+library(tidyverse)
+library(ggplot2)
+library(forcats)
+library(patchwork)
+library(dplyr)
+library(car)
+
+box_theme <- theme_bw() + 
+  theme(
+    plot.title = element_text(color = "black", size = 15),
+    panel.background = element_rect(fill = "white"),
+    axis.title.x = element_text(color = "black", size = 15),
+    axis.text.x = element_text(size = 15, angle = 45, hjust = 1),
+    axis.title.y = element_text(color = "black", size = 15),
+    axis.text.y = element_text(size = 15),
+    legend.position = "right",
+    legend.text = element_text(size = 16),
+    legend.title = element_text(size = 16), 
+    strip.text = element_text(size = 16)
+  )
+
+# ---------------------------------------------
+# Import data
+# ---------------------------------------------
+#file.choose()
+table <- read_tsv(
+  "C:\\Users\\s2673271\\OneDrive - University of Edinburgh\\PhD\\Y1\\Sciaridae\\GRC_expression_analysis\\B_coprophila\\germline_contamination\\contamination_table.tsv",
+  col_names = FALSE
+) %>%
+  mutate(X4 = as.numeric(X4))  # ensure TPM is numeric
+
+# ---------------------------------------------
+# Filter early stages and apply expression threshold
+# ---------------------------------------------
+TPM_threshold <- 0.22
+
+keep_genes <- table %>%
+  filter(!X6 %in% c("0-4h", "4-8h")) %>%
+  mutate(Sex = ifelse(grepl("female", X5), "female", "male")) %>%
+  filter(X4 > TPM_threshold) %>%
+  group_by(X1, X3, X6) %>%
+  summarise(Library_count = n(), .groups = "drop") %>%
+  filter(Library_count >= 2)
+
+# Keep only expressed genes
+filtered_table <- table %>%
+  mutate(Sex = ifelse(grepl("female", X5), "female", "male")) %>%
+  inner_join(keep_genes, by = c("X1", "X3", "X6")) %>%
+  filter(X4 > TPM_threshold) %>%
+  mutate(logTPM = log10(X4 + 1))
+
+# ---------------------------------------------
+# Simple average TPM visualisation (bar chart)
+# ---------------------------------------------
+filtered_table %>%
+  group_by(X1, X3, X6, Sex) %>%
+  summarise(avg_TPM = mean(X4, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = X1, y = log1p(avg_TPM), fill = X3)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  facet_grid(Sex ~ X6) +
+  scale_fill_manual(
+    values = c(
+      "germ_testes" = "#6A5ACD",
+      "germ_ovaries" = "salmon",
+      "soma_carcass" = "grey70"
+    ),
+    name = "Library Type"
+  ) +
+  labs(
+    title = "Average TPM per gene and tissue by sex and developmental stage",
+    x = "Gene",
+    y = "log(1 + TPM)"
+  ) +
+  box_theme -> plot_tpm
+
+plot_tpm
+
+# ---------------------------------------------
+# Prepare data for statistical testing
+# ---------------------------------------------
+# Only doing somatic library TPM for genes shared in amles and females
+carcass_raw <- filtered_table %>%
+  filter(X1 %in% c("AGO3_2", "vasa") & X3 == "soma_carcass")
+
+# ---------------------------------------------
+# Replication check
+# ---------------------------------------------
+replication <- carcass_raw %>%
+  group_by(X1, X6, Sex) %>%
+  summarise(n = n(), .groups = "drop")
+
+replication  # must have n >= 3 for normality testing 
+
+# ---------------------------------------------
+# Normality test (Shapiro–Wilk)
+# ---------------------------------------------
+normality_results <- carcass_raw %>%
+  group_by(X1, X6, Sex) %>%
+  filter(n() >= 3) %>%
+  summarise(
+    n = n(),
+    p_value = shapiro.test(logTPM)$p.value,
+    .groups = "drop"
+  )
+
+normality_results
+
+# QQ plots
+ggplot(carcass_raw %>% filter(n() >= 3), aes(sample = logTPM, color = Sex)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_grid(X1 ~ X6) +
+  labs(title = "QQ plots of log10(TPM) for carcass genes by sex and stage")
+
+# ---------------------------------------------
+# Homogeneity of variance (Levene’s test)
+# ---------------------------------------------
+levene_results <- carcass_raw %>%
+  group_by(X1, X6) %>%
+  filter(n() >= 2, n_distinct(Sex) > 1) %>%
+  summarise(
+    p_value = car::leveneTest(logTPM ~ Sex)$`Pr(>F)`[1],
+    .groups = "drop"
+  )
+
+levene_results
+
+# ---------------------------------------------
+# Sex comparison (Welch’s t-test)
+# ---------------------------------------------
+t_test_results <- carcass_raw %>%
+  group_by(X1, X6) %>%
+  filter(n() >= 2, n_distinct(Sex) > 1) %>%
+  summarise(
+    p_value = t.test(logTPM ~ Sex)$p.value,
+    female_mean = mean(logTPM[Sex == "female"]),
+    male_mean = mean(logTPM[Sex == "male"]),
+    diff = female_mean - male_mean,
+    .groups = "drop"
+  )
+
+t_test_results
+
+# ---------------------------------------------
+# Annotated boxplot (final plot for Fig. S2)
+# ---------------------------------------------
+t_test_results <- t_test_results %>%
+  mutate(
+    signif_label = case_when(
+      p_value < 0.001 ~ "***",
+      p_value < 0.01  ~ "**",
+      p_value < 0.05  ~ "*",
+      TRUE ~ "ns"
+    ),
+    label = paste0("p = ", signif(p_value, 3), "\n", signif_label)
+  )
+
+# Calculate label positions
+label_positions <- filtered_table %>%
+  group_by(X1, X6) %>%
+  summarise(y_pos = max(logTPM, na.rm = TRUE) + 0.1, .groups = "drop")
+
+t_test_labels <- t_test_results %>%
+  left_join(label_positions, by = c("X1", "X6"))
+
+plot_tpm_box_filtered_annot <- ggplot(filtered_table,
+                                      aes(x = X1, y = logTPM, fill = X3)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.8, width = 0.6) +
+  geom_jitter(aes(color = X3), width = 0.2, size = 2, alpha = 0.7) +
+  facet_grid(Sex ~ X6) +
+  scale_fill_manual(
+    values = c(
+      "germ_testes" = "#6A5ACD",
+      "germ_ovaries" = "salmon",
+      "soma_carcass" = "grey70"
+    ),
+    name = "Tissue type"
+  ) +
+  scale_color_manual(
+    values = c(
+      "germ_testes" = "#6A5ACD",
+      "germ_ovaries" = "salmon",
+      "soma_carcass" = "grey70"
+    ),
+    guide = "none"
+  ) +
+  geom_text(
+    data = t_test_labels,
+    aes(x = X1, y = y_pos, label = label),
+    inherit.aes = FALSE,
+    size = 5,
+    fontface = "italic",
+    vjust = 0
+  ) +
+  labs(
+    title = "Expressed germline marker genes in germline and somatic libraries",
+    subtitle = "Welch’s t-test between sexes for somatic  (AGO3_2 and vasa)",
+    x = "Gene",
+    y = "log10(TPM + 1)"
+  ) +
+  box_theme +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+plot_tpm_box_filtered_annot
+
