@@ -1,0 +1,183 @@
+library(tidyverse)
+library(ggplot2)
+library(forcats)
+library(patchwork)
+library(dplyr)
+library(car)
+library(ggtext) 
+
+box_theme <- theme_bw() + 
+  theme(plot.title = element_text(color="black", size=15),
+        panel.background = element_rect(fill="white"),
+        axis.title.x = element_text(color="black", size=15),
+        axis.text.x = element_text(size = 15, angle = 45, hjust = 1),
+        axis.title.y = element_text(color="black", size=15),
+        axis.text.y = element_text(size = 15), 
+        legend.position = "right", 
+        legend.text = element_text(size = 16), 
+        legend.title = element_text(size = 16))
+
+# ----- Set consistent chromosome order -----
+chromosomes <- c("SUPER_1", "SUPER_2", "SUPER_3", "SUPER_X", "SUPER_GRC1", "SUPER_GRC2")
+GRCs  <- c("SUPER_GRC1", "SUPER_GRC2")
+
+# ----- Plot 1) Raw Gene count v Gene expression per stage -----
+gtf <- read_tsv("C:\\Users\\s2673271\\OneDrive - University of Edinburgh\\PhD\\Y1\\Sciaridae\\Annotations\\bcop_core_GRC.gff3",
+                comment = "#", col_names = FALSE)
+colnames(gtf)[1:9] <- c("seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute")
+
+genes_per_scaffold <- gtf %>%
+  filter(feature == "gene") %>%
+  mutate(gene_id = str_extract(attribute, "ID=[^;]+") %>% str_remove("ID=")) %>%
+  distinct(seqname, gene_id) %>%
+  filter(seqname %in% chromosomes) %>%
+  count(seqname, name = "Num_genes") %>%
+  mutate(Chromosome = fct_relevel(seqname, chromosomes))
+genes_per_scaffold
+
+TPM_genes <- read_tsv("C:\\Users\\s2673271\\OneDrive - University of Edinburgh\\PhD\\Y1\\Sciaridae\\GRC_expression_analysis\\B_coprophila\\01_STAR_TPM\\combined_TPM_only.tsv", 
+                      col_names = FALSE)
+colnames(TPM_genes) <- c("Chromosome", "TPM", "Gene", "Species", "Sex", "Tissue", "Stage", "Sample")
+TPM_genes
+
+grc_genes <- c("g11713", "g13362", "g13363", "g13694", "g15174",
+               "g16029", "g17107", "g17119", "g19161", "g233",
+               "g491", "g596", "g7610", "g7957", "g8036")
+
+grc_TPM <- TPM_genes %>%
+  filter(Gene %in% grc_genes)
+grc_TPM
+
+grc_TPM_clean <- grc_TPM %>%
+  mutate(Sex = case_when(
+    Sex %in% c("gynogenic_female", "androgenic_female") ~ "female",
+    TRUE ~ Sex
+  ))
+
+ggplot(grc_TPM_clean, 
+       aes(x = Gene, y = TPM, fill = Sex)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.8, width = 0.6) +
+  geom_jitter(aes(color = Sex), width = 0.2, size = 2, alpha = 0.7) +
+  scale_y_log10() +
+  labs(title = "Expression of GRC-expressed genes by sex",
+       x = "Gene",
+       y = "TPM (log10 scale)") +
+  box_theme +
+  theme(legend.position = "top",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+######################################################################################################
+# Statistics 
+######################################################################################################
+
+# Shapiro test 
+grc_TPM_plotdata <- grc_TPM_plotdata %>%
+  mutate(logTPM = log10(TPM))
+
+normality_results <- grc_TPM_plotdata %>%
+  group_by(Stage, Sex) %>%
+  summarise(p_value = shapiro.test(logTPM)$p.value,
+            n = n(),
+            .groups = "drop")
+
+normality_results
+
+# QQ
+ggplot(grc_TPM_plotdata, aes(sample = logTPM, color = Sex)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~Stage) +
+  labs(title = "QQ plots of log10(TPM) by stage and sex")
+
+# Shapiro test and QQ plot support normally distributed data -> can use parametric test 
+
+levene_results <- grc_TPM_plotdata %>%
+  group_by(Stage) %>%
+  filter(n_distinct(Sex) > 1) %>%   # only stages with both sexes
+  summarise(
+    p_value = car::leveneTest(logTPM ~ Sex)$`Pr(>F)`[1]
+  )
+
+levene_results
+
+#Unequal variance for adults -> Welch test 
+
+stage_tests <- grc_TPM_plotdata %>%
+  group_by(Stage) %>%
+  filter(n_distinct(Sex) > 1) %>%
+  summarise(
+    p_value = t.test(logTPM ~ Sex)$p.value,
+    female_mean = mean(logTPM[Sex == "female"], na.rm = TRUE),
+    male_mean = mean(logTPM[Sex == "male"], na.rm = TRUE),
+    diff = female_mean - male_mean,
+    .groups = "drop"
+  )
+
+stage_tests
+
+######################################################################################################
+# Final plot 
+######################################################################################################
+
+# Step 1: Prepare  p-values for annotation
+stage_tests <- tibble::tribble(
+  ~Stage, ~p_value, ~female_mean, ~male_mean, ~diff,
+  "adult", 0.00859, -0.373, 0.0151, -0.388,
+  "late-larva-early-pupa", 0.152, -0.0410, 0.201, -0.242
+) %>%
+  mutate(
+    label = case_when(
+      p_value < 0.001 ~ "***",
+      p_value < 0.01  ~ "**",
+      p_value < 0.05  ~ "*",
+      TRUE            ~ "n.s."
+    ),
+    p_text = paste0("p = ", signif(p_value, 3), " (", label, ")")
+  )
+
+# Step 2: Base plot
+p1 <- ggplot(grc_TPM_plotdata, 
+             aes(x = Gene, y = TPM, fill = Sex)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.8, width = 0.6, color = "grey40") +
+  geom_jitter(aes(color = Sex), width = 0.2, size = 2, alpha = 0.7) +
+  scale_y_log10() +
+  labs(title = "Expression of confidently GRC-expressed genes by sex",
+       subtitle = "Only genes with TPM > 0.22 in ≥2 libraries",
+       x = "",
+       y = expression("TPM (log"[10]*" scale)")) +
+  box_theme +
+  theme(legend.position = "top",
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("female" = "#FF69B4", "male" = "#1E90FF")) +
+  scale_color_manual(values = c("female" = "#FF69B4", "male" = "#1E90FF"))
+
+# Step 3: Add stage facets and p-values ----
+p2 <- ggplot(grc_TPM_plotdata, 
+             aes(x = Gene, y = TPM, fill = Sex)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.8, width = 0.6, color = "grey40") +
+  geom_jitter(aes(color = Sex), width = 0.2, size = 2, alpha = 0.7) +
+  scale_y_log10() +
+  facet_wrap(~Stage, scales = "free_x") +
+  labs(title = "Per Developmental Stage",
+       subtitle="Comparison between sexes for late larval and adult data using Welch's t-test",
+       x = "Gene ID",
+       y = expression("TPM (log"[10]*" scale)")) +
+  box_theme +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size=11)) +
+  scale_fill_manual(values = c("female" = "#FF69B4", "male" = "#1E90FF")) +
+  scale_color_manual(values = c("female" = "#FF69B4", "male" = "#1E90FF")) +
+  geom_text(
+    data = stage_tests,
+    aes(x = 5, y = Inf, label = p_text),
+    vjust = 1.5, size = 5, inherit.aes = FALSE
+  )
+
+# Step 4: Combine plots ----
+final_plot <- p1 / p2 +
+  plot_annotation(tag_levels = "A") &
+  theme(plot.tag = element_text(size = 20, face = "bold"))
+
+final_plot
+
