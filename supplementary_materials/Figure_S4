@@ -76,10 +76,16 @@ ggplot(grc_TPM_clean,
 # Statistics 
 # ---------------------------------------------
 
-# Shapiro test 
-grc_TPM_plotdata <- grc_TPM_plotdata %>%
-  mutate(logTPM = log10(TPM))
+# Prepare final plot data and apply filtering
+grc_TPM_plotdata <- grc_TPM_clean %>%
+  filter(TPM > 0.22) %>%        # Keep confidently expressed genes
+  group_by(Gene, Stage, Sex) %>%
+  filter(n() >= 2) %>%          # Keep only if ≥2 replicates
+  ungroup() %>%
+  mutate(logTPM = log10(TPM))   # <-- ADD THIS LINE
 
+
+# Shapiro test 
 normality_results <- grc_TPM_plotdata %>%
   group_by(Stage, Sex) %>%
   summarise(p_value = shapiro.test(logTPM)$p.value,
