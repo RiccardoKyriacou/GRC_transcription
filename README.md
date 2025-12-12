@@ -2,15 +2,17 @@
 
 ### Overview
 
-This directory contains all code for the pre-print "Evidence for Transcription and Horizontal Gene Transfer in Dipteran Germline-Restricted Chromosomes".
+This directory contains all code for the pre-print:
 
-Riccardo G. Kyriacou1,†, Marion Herbette1, Robert B. Baird3, Katy M. Monteith1, Laura Ross1,†, Christina N. Hodson2
+#### "Evidence for Transcription and Horizontal Gene Transfer in Dipteran Germline-Restricted Chromosomes".
 
-1 Institute of Ecology and Evolution, University of Edinburgh, UK 
-2 University College London, UCL Department of Genetics, Evolution & Environment, UK
-3 Whitehead Institute for Biomedical Science and Howard Hughes Medical Institute, Cambridge, Massachusetts, USA
+##### Riccardo G. Kyriacou1,†, Marion Herbette1, Robert B. Baird3, Katy M. Monteith1, Laura Ross1,†, Christina N. Hodson2
 
-†Corresponding authors: R.G.Kyriacou@sms.ed.ac.uk, Laura.Ross@ed.ac.uk 
+##### 1 Institute of Ecology and Evolution, University of Edinburgh, UK 
+##### 2 University College London, UCL Department of Genetics, Evolution & Environment, UK
+##### 3 Whitehead Institute for Biomedical Science and Howard Hughes Medical Institute, Cambridge, Massachusetts, USA
+
+##### †Corresponding authors: R.G.Kyriacou@sms.ed.ac.uk, Laura.Ross@ed.ac.uk 
 
 It provides scripts, analyses, and outputs for RNA-seq mapping, intergenic mapping, GRC gene expression, and horizontal gene transfer analysis, ordered accordingly to the manuscript. README files provided for each subdirectory providing usage information for scripts. 
 
