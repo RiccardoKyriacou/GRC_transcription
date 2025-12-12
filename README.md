@@ -6,7 +6,7 @@ This directory contains all code for the pre-print:
 
 #### "Evidence for Transcription and Horizontal Gene Transfer in Dipteran Germline-Restricted Chromosomes".
 
-##### _Riccardo G. Kyriacou1,†, Marion Herbette1, Robert B. Baird3, Katy M. Monteith1, Laura Ross1,†, Christina N. Hodson2_
+##### _Riccardo G. Kyriacou 1,†, Marion Herbette 1, Robert B. Baird 3, Katy M. Monteith 1, Laura Ross 1,†, Christina N. Hodson 2_
 
 ###### 1 Institute of Ecology and Evolution, University of Edinburgh, UK 
 ###### 2 University College London, UCL Department of Genetics, Evolution & Environment, UK
