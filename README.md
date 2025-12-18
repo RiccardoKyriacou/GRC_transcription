@@ -2,7 +2,7 @@
 
 ### Overview
 
-This directory contains all code for the pre-print:
+This directory contains all code for the pre-print: https://www.biorxiv.org/content/10.64898/2025.12.11.693641v1
 
 #### "Evidence for Transcription and Horizontal Gene Transfer in Dipteran Germline-Restricted Chromosomes".
 
